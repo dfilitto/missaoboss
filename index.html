@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Apaga-Fogo da Coordenação</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --text-color: #e94560;
+            --board-color: #0f3460;
+            --hole-color: #16213e;
+            --text-hud: #4a90e2;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none; /* Impede seleção de texto acidental no mobile */
+        }
+
+        .screen { display: none; width: 100%; max-width: 500px; padding: 15px; box-sizing: border-box; }
+        .screen.active { display: block; }
+
+        /* Tela 1: Homenagem */
+        #img-container {
+            margin: 15px auto;
+            border: 4px solid var(--text-color);
+            padding: 5px;
+            background: #fff;
+            display: inline-block;
+            width: 80%; /* Responsivo */
+            max-width: 400px;
+            box-sizing: border-box;
+        }
+        
+        #foto-chefe {
+            width: 100%; /* Ocupa 100% do container */
+            aspect-ratio: 1 / 1; /* Mantém sempre quadrado */
+            object-fit: cover;
+            image-rendering: pixelated; 
+            display: block;
+        }
+
+        .homenagem-texto {
+            font-size: clamp(9px, 2.5vw, 12px); /* Se adapta à tela */
+            line-height: 1.8;
+            color: #ccc;
+            margin-bottom: 25px;
+            text-shadow: 2px 2px #000;
+        }
+
+        /* Botões */
+        button {
+            background-color: var(--text-color);
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            border: 4px solid #fff;
+            padding: 15px;
+            width: 100%; /* Botão largo para facilitar toque no mobile */
+            font-size: clamp(10px, 3vw, 14px);
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0px #000;
+            transition: transform 0.1s;
+            touch-action: manipulation; /* Evita zoom no double tap */
+        }
+        button:active {
+            transform: translate(4px, 4px);
+            box-shadow: none;
+        }
+        .blink { animation: blinker 1.5s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0.5; } }
+
+        /* Tela 2: Jogo */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(9px, 2.5vw, 12px);
+            margin-bottom: 15px;
+            color: var(--text-hud);
+            background: #000;
+            padding: 10px;
+            border: 2px solid var(--board-color);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px; /* Reduzido para mobile */
+            background-color: var(--board-color);
+            padding: 10px;
+            border-radius: 10px;
+            border: 4px solid #4a90e2;
+            touch-action: manipulation; /* Evita zoom no double tap no grid */
+        }
+        
+        .hole {
+            background-color: var(--hole-color);
+            aspect-ratio: 1; /* Sempre quadrado perfeito */
+            border-radius: 5px;
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+            cursor: crosshair;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+        }
+        
+        .alvo {
+            position: absolute;
+            bottom: -100%;
+            transition: bottom 0.1s;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        .alvo.up { bottom: 5%; } /* Subida ajustada */
+        
+        .alvo-emoji {
+            font-size: clamp(28px, 8vw, 45px); /* Tamanho responsivo dos emojis */
+            margin-bottom: 2px;
+        }
+        
+        .alvo-text {
+            font-size: clamp(6px, 1.8vw, 10px); /* Texto responsivo */
+            color: #fff;
+            text-shadow: 1px 1px 0 #000;
+            text-align: center;
+            line-height: 1.2;
+        }
+        
+        .resolvido {
+            position: absolute;
+            color: #00ff00;
+            font-size: clamp(8px, 2.5vw, 12px);
+            z-index: 10;
+            text-shadow: 2px 2px #000;
+            pointer-events: none;
+            display: none;
+            transform: rotate(-15deg);
+            border: 2px solid #00ff00;
+            padding: 4px;
+            background: rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        /* Tela 3: Game Over */
+        .game-over-title { font-size: clamp(16px, 5vw, 24px); margin-bottom: 20px; }
+        .win { color: #00ff00; }
+        .lose { color: var(--text-color); }
+        .final-score { font-size: clamp(10px, 3vw, 14px); margin-bottom: 40px; color: #fff; line-height: 1.8; }
+    </style>
+</head>
+<body>
+
+    <!-- TELA 1: HOMENAGEM -->
+    <div id="screen-splash" class="screen active">
+        <h2 style="color: var(--text-color); font-size: clamp(14px, 4vw, 18px); margin-top:0;">Coordenação Arcade</h2>
+        
+        <!-- TAG DE IMAGEM TOTALMENTE RESPONSIVA -->
+        <div id="img-container">
+            <img id="foto-chefe" src="foto.jpg" alt="Nossa Coordenadora">
+        </div>
+
+        <div class="homenagem-texto">
+            Status: Líder / Boss.<br><br>
+            Renata, seu legado de sempre apoiar e salvar os professores de qualquer situação jamais será esquecido!<br><br>
+            Obrigado por ter sido uma líder excepcional e nossa maior companheira. Agora, que tal nos ajudar nestes últimos B.Os?!
+        </div>
+        <button id="btn-start" class="blink">INICIAR EXPEDIENTE</button>
+    </div>
+
+    <!-- TELA 2: GAMEPLAY -->
+    <div id="screen-game" class="screen">
+        <div class="hud">
+            <div>TEMPO: <span id="time-left" style="color:#fff">30</span>s</div>
+            <div>META: <span style="color:#fff">8</span></div>
+            <div>B.Os: <span id="score" style="color:#fff">0</span></div>
+        </div>
+        <div class="grid" id="board"></div>
+    </div>
+
+    <!-- TELA 3: GAME OVER -->
+    <div id="screen-gameover" class="screen">
+        <div id="end-title" class="game-over-title">FIM DO EXPEDIENTE!</div>
+        <div id="end-text" class="final-score"></div>
+        <button id="btn-restart">FAZER HORA EXTRA</button>
+    </div>
+
+    <script>
+        // --- SÍNTESE DE ÁUDIO 8-BITS (Web Audio API) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            const now = audioCtx.currentTime;
+
+            if (type === 'hit') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'spawn') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(250, now);
+                gainNode.gain.setValueAtTime(0.05, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'win') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554, now + 0.2);
+                osc.frequency.setValueAtTime(659, now + 0.4);
+                osc.frequency.setValueAtTime(880, now + 0.6);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 1);
+                osc.start(now);
+                osc.stop(now + 1);
+            } else if (type === 'lose') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 1);
+                gainNode.gain.setValueAtTime(0.1, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 1);
+                osc.start(now);
+                osc.stop(now + 1);
+            }
+        }
+
+        // --- VARIÁVEIS E LÓGICA DO JOGO ---
+        const META_VITORIA = 8;
+        let score = 0;
+        let timeLeft = 30;
+        let timerId;
+        let activeHole = null;
+
+        const problemas = [
+            { emoji: '💻🔥', text: 'Sistema\nCaiu' },
+            { emoji: '📕⏰', text: 'Diário\nAtrasado' },
+            { emoji: '🤷❓', text: 'Aluno\nPerdido' },
+            { emoji: '☎️🚨', text: 'Reunião\nSurpresa' }
+        ];
+        const holes = [];
+
+        const screenSplash = document.getElementById('screen-splash');
+        const screenGame = document.getElementById('screen-game');
+        const screenGameover = document.getElementById('screen-gameover');
+        const scoreDisplay = document.getElementById('score');
+        const timeDisplay = document.getElementById('time-left');
+        const board = document.getElementById('board');
+        const endTitle = document.getElementById('end-title');
+        const endText = document.getElementById('end-text');
+
+        for (let i = 0; i < 9; i++) {
+            const hole = document.createElement('div');
+            hole.classList.add('hole');
+            
+            const alvo = document.createElement('div');
+            alvo.classList.add('alvo');
+            
+            const emojiDiv = document.createElement('div');
+            emojiDiv.classList.add('alvo-emoji');
+            
+            const textDiv = document.createElement('div');
+            textDiv.classList.add('alvo-text');
+
+            alvo.appendChild(emojiDiv);
+            alvo.appendChild(textDiv);
+            
+            const resolvido = document.createElement('div');
+            resolvido.classList.add('resolvido');
+            resolvido.innerText = "B.O SALVO!";
+
+            hole.appendChild(alvo);
+            hole.appendChild(resolvido);
+            board.appendChild(hole);
+            
+            holes.push({ element: hole, alvo: alvo, emojiDiv: emojiDiv, textDiv: textDiv, resolvido: resolvido, isUp: false });
+
+            // Eventos unificados de mouse e toque para garantir resposta rápida
+            const hitAction = (e) => {
+                e.preventDefault(); // Impede comportamento duplo em touchscreens
+                bonk(i);
+            };
+            
+            hole.addEventListener('mousedown', hitAction);
+            hole.addEventListener('touchstart', hitAction);
+        }
+
+        function showScreen(screenElement) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            screenElement.classList.add('active');
+        }
+
+        function randomTime(min, max) {
+            return Math.round(Math.random() * (max - min) + min);
+        }
+
+        function randomHole() {
+            const idx = Math.floor(Math.random() * holes.length);
+            const hole = holes[idx];
+            if (hole === activeHole) return randomHole(); 
+            return hole;
+        }
+
+        function peep() {
+            if (timeLeft <= 0) return;
+
+            const time = randomTime(700, 1300);
+            const hole = randomHole();
+            
+            const problemaAtual = problemas[Math.floor(Math.random() * problemas.length)];
+            hole.emojiDiv.innerText = problemaAtual.emoji;
+            hole.textDiv.innerText = problemaAtual.text;
+            
+            hole.alvo.classList.add('up');
+            hole.isUp = true;
+            activeHole = hole;
+            
+            playSound('spawn');
+
+            setTimeout(() => {
+                hole.alvo.classList.remove('up');
+                hole.isUp = false;
+                if (timeLeft > 0) peep();
+            }, time);
+        }
+
+        function bonk(index) {
+            const hole = holes[index];
+            if (!hole.isUp) return; 
+
+            score++;
+            scoreDisplay.textContent = score;
+            hole.alvo.classList.remove('up');
+            hole.isUp = false;
+            
+            playSound('hit');
+
+            hole.resolvido.style.display = 'block';
+            setTimeout(() => { hole.resolvido.style.display = 'none'; }, 300);
+        }
+
+        function startGame() {
+            initAudio(); 
+            score = 0;
+            timeLeft = 30; 
+            scoreDisplay.textContent = score;
+            timeDisplay.textContent = timeLeft;
+            showScreen(screenGame);
+            
+            peep(); 
+
+            timerId = setInterval(() => {
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function endGame() {
+            clearInterval(timerId);
+            holes.forEach(h => h.alvo.classList.remove('up')); 
+            
+            if (score >= META_VITORIA) {
+                endTitle.textContent = "🏆 VITÓRIA! 🏆";
+                endTitle.className = "game-over-title win";
+                endText.innerHTML = `Incrível! Você sobreviveu ao expediente e resolveu <span style="font-size: clamp(18px, 5vw, 24px); color:#4a90e2">${score}</span> B.Os!<br><br>A coordenação está salva.`;
+                playSound('win');
+            } else {
+                endTitle.textContent = "💥 DERROTA! 💥";
+                endTitle.className = "game-over-title lose";
+                endText.innerHTML = `Você resolveu ${score} B.Os, mas a meta era ${META_VITORIA}...<br><br>O caos tomou conta da unidade!`;
+                playSound('lose');
+            }
+            
+            showScreen(screenGameover);
+        }
+
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', startGame);
+
+    </script>
+</body>
+</html>
